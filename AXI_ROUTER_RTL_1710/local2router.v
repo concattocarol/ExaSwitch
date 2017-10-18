@@ -24,7 +24,7 @@ module local2router#( DATA_WIDTH=70)(
    input clk,
    input rst,
    //ROUTER INTERFACE (output)   
-   output  [DATA_WIDTH-1:0] data_router, 
+   (*mark_debug="true"*)output  [DATA_WIDTH-1:0] data_router, 
    output  val,
    input  ack,
    //LOCAL PORT INTERFACE 
@@ -40,8 +40,8 @@ module local2router#( DATA_WIDTH=70)(
     wire rok_int;
     wire ack_int;
     wire [DATA_WIDTH-1:0] data_fifo;
-    reg [14:0] packet_size,packet_counter;
-    reg packet_finish_1,packet_finish;
+   (*mark_debug="true"*) reg [14:0] packet_size,packet_counter;
+   (*mark_debug="true"*)reg packet_finish_1,packet_finish;
     
     //LOGIC WITH THE LOCAL PORT
     //RECEIVE FLITS AND STORE IN THE FIFO.
@@ -65,12 +65,23 @@ module local2router#( DATA_WIDTH=70)(
          reg [2:0]next_state;
          reg [DATA_WIDTH-1:0] data_router_int;
          reg  val_int;
+         reg wr_flag;
          wire tvalid_int,tlast_int;
          reg tvalid_1,tvalid_2;
          assign tvalid_int=data_fifo[69];
          assign tlast_int=data_fifo[68];
          
-         
+         always@(posedge clk) begin
+            if (rst==1'b1) wr_flag=1'b0;
+            else begin
+                 if  (tvalid==1'b1 && tvalid_1==1'b0) begin 
+                       if(tdata[47:43]==5'b00000 || tdata[47:43]==5'b00011) begin wr_flag=1'b1; end else begin wr_flag=1'b0;end            
+                end else begin
+                    wr_flag=wr_flag;
+                end
+            end
+        end  
+           
          always@(posedge clk)begin
             if(rst==1'b1) begin tvalid_2=1'b0; tvalid_1=1'b0; end
             else begin tvalid_2=tvalid_1; tvalid_1=tvalid; end
@@ -132,7 +143,7 @@ module local2router#( DATA_WIDTH=70)(
            s2: if(packet_finish_1==1'b1) begin 
                        next_state=s3;
                 end else begin 
-                    if (packet_size==14'd4) next_state=s3; else if (ack==1'b1)   next_state=s2; //else if not fifo space
+                    if (wr_flag==1'b1) next_state=s3; else if (ack==1'b1)   next_state=s2; //else if not fifo space
                  end
             s3:  next_state=s4;
             s4:  next_state=s0;
